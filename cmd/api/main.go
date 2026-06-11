@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/CodingFervor/online-exam-platform/internal/database"
 )
 
 func main() {
@@ -65,7 +67,24 @@ func main() {
 		}
 	}
 	log.Println("Online Exam Platform starting on :8080")
-	r.Run(":8080")
+	addr := ":" + strconv.Itoa(8080)
+	srv := &http.Server{Addr: addr, Handler: r}
+	go func() {
+		logger.Info("server listening", "port", 8080)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("server error", "error", err)
+		}
+	}()
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	logger.Info("shutting down...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Error("forced shutdown", "error", err)
+	}
+	logger.Info("server exited")
 }
 
 func CORS() gin.HandlerFunc {
